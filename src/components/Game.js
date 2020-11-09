@@ -1,48 +1,49 @@
-import React from "react";
+import React, { useContext, useEffect } from "react";
 import styled from "styled-components";
 import { Link } from "react-router-dom";
-
-import useInterval from "../hooks/use-interval.hook";
-
-import cookieSrc from "../cookie.svg";
 import Item from "./Item";
 
-const items = [
-  { id: "cursor", name: "Cursor", cost: 10, value: 1 },
-  { id: "grandma", name: "Grandma", cost: 100, value: 10 },
-  { id: "farm", name: "Farm", cost: 1000, value: 80 },
-];
+import { useInterval } from "../hooks/use-interval.hook";
+import { usePersistedState } from "../hooks/use-persisted-state.hook";
 
-const calculateCookiesPerSecond = (purchasedItems) => {
-  return Object.keys(purchasedItems).reduce((acc, itemId) => {
-    const numOwned = purchasedItems[itemId];
-    const item = items.find((item) => item.id === itemId);
-    const value = item.value;
+import cookieSrc from "../cookie.svg";
+import { items } from "./Data";
 
-    return acc + value * numOwned;
-  }, 0);
-};
+import { GameContext } from "./GameContext";
 
 const Game = () => {
-  const [numCookies, setNumCookies] = React.useState(1000);
+  const {
+    numCookies,
+    setNumCookies,
+    purchasedItems,
+    setPurchasedItems,
+    cookiesPerSecond,
+    timeClosed,
+    setTimeClosed,
+  } = useContext(GameContext);
 
-  const [purchasedItems, setPurchasedItems] = React.useState({
-    cursor: 0,
-    grandma: 0,
-    farm: 0,
-  });
+  // useInterval(() => {
+  //   const numOfGeneratedCookies = calculateCookiesPerSecond(purchasedItems);
+
+  //   setNumCookies(numCookies + numOfGeneratedCookies);
+  // }, 1000);
+
+  const cookiesWhileAway = () => {
+    const timeOpened = new Date().getTime();
+    const timeElapsed = (timeOpened - timeClosed) / 1000;
+    const cookiesUpdate = cookiesPerSecond * timeElapsed;
+    setNumCookies(Math.round(cookiesUpdate));
+  };
+
+  useEffect(() => {
+    cookiesWhileAway();
+  }, []);
 
   const incrementCookies = () => {
     setNumCookies((c) => c + 1);
   };
 
-  useInterval(() => {
-    const numOfGeneratedCookies = calculateCookiesPerSecond(purchasedItems);
-
-    setNumCookies(numCookies + numOfGeneratedCookies);
-  }, 1000);
-
-  React.useEffect(() => {
+  useEffect(() => {
     document.title = `${numCookies} cookies - Cookie Clicker Workshop`;
 
     return () => {
@@ -50,15 +51,18 @@ const Game = () => {
     };
   }, [numCookies]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeydown = (ev) => {
       if (ev.code === "Space") {
         incrementCookies();
       }
     };
 
-    window.addEventListener("keydown", handleKeydown);
+    window.addEventListener("beforeunload", () => {
+      setTimeClosed(new Date().getTime());
+    });
 
+    window.addEventListener("keydown", handleKeydown);
     return () => {
       window.removeEventListener("keydown", handleKeydown);
     };
@@ -69,8 +73,7 @@ const Game = () => {
       <GameArea>
         <Indicator>
           <Total>{numCookies} cookies</Total>
-          <strong>{calculateCookiesPerSecond(purchasedItems)}</strong> cookies
-          per second
+          <strong>{cookiesPerSecond}</strong> cookies per second
         </Indicator>
         <Button onClick={incrementCookies}>
           <Cookie src={cookieSrc} />
